@@ -1,29 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AR/VR Scene</title>
-  <link rel="stylesheet" href="main.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Three.js AR Demo</title>
+    <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
-  <div id="mySidenav" class="sidenav">
-    <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
-    <a id="Scaniverse_2024-07-15_170330" class="ar-object">Scaniverse Model</a>
-  </div>
-  <div id="container"></div>
-  <div id="content">
-    <button id="place-button">Place Object</button>
-  </div>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.133.1/build/three.module.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.133.1/examples/jsm/controls/OrbitControls.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.133.1/examples/jsm/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.133.1/examples/jsm/loaders/RGBELoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.133.1/examples/jsm/webxr/ARButton.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.133.1/examples/jsm/webxr/VRButton.js"></script>
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="main.js"></script>
+    <div id="container"></div>
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+        <a class="ar-object" id="Scaniverse_2024-07-15_170330" href="#">Load Model</a>
+    </div>
+    <span style="font-size:30px;cursor:pointer;position: absolute;" onclick="openNav()">&#9776; open</span>
+    <button type="button" id="place-button">PLACE</button>
+
+    <script type="module">
+        import * as THREE from './js/three.module.js';
+        import { ARButton } from './js/ARButton.js';
+        import { VRButton } from './js/VRButton.js';
+        import { OrbitControls } from './js/OrbitControls.js';
+        import { GLTFLoader } from './js/GLTFLoader.js';
+        import { RGBELoader } from './js/RGBELoader.js';
+
+        let container, camera, scene, renderer;
+        let controller, reticle, pmremGenerator, currentObject, controls;
+        let hitTestSource = null;
+        let hitTestSourceRequested = false;
+
+        init();
+        animate();
+
+        document.querySelector(".ar-object").addEventListener("click", function () {
+            if (currentObject != null) {
+                scene.remove(currentObject);
+            }
+            loadModel(this.id);
+        });
+
+        document.getElementById("place-button").addEventListener("click", arPlace);
+
+        function arPlace() {
+            if (reticle.visible) {
+                currentObject.position.setFromMatrixPosition(reticle.matrix);
+                currentObject.visible = true;
+            }
+        }
+
+        function loadModel(model) {
+            new RGBELoader()
+                .setDataType(THREE.UnsignedByteType)
+                .setPath('textures/')
+                .load('photo_studio_01_1k.hdr', function (texture) {
+                    const envmap = pmremGenerator.fromEquirectangular(texture).texture;
+                    scene.environment = envmap;
+                    texture.dispose();
+                    pmremGenerator.dispose();
+
+                    const loader = new GLTFLoader().setPath('models/');
+                    loader.load(model + ".glb", function (glb) {
+                        currentObject = glb.scene;
+                        scene.add(currentObject);
+                        arPlace();
+
+                        const box = new THREE.Box3();
+                        box.setFromObject(currentObject);
+                        box.center(controls.target);
+
+                        controls.update();
+                    });
+                });
+        }
+
+        function init() {
+            container = document.createElement('div');
+            document.getElementById("container").appendChild(container);
+
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.001, 200);
+
+            const directionalLight = new THREE.DirectionalLight(0xdddddd, 1);
+            directionalLight.position.set(0, 0, 1).normalize();
+            scene.add(directionalLight);
+
+            const ambientLight = new THREE.AmbientLight(0x222222);
+            scene.add(ambientLight);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            pmremGenerator = new THREE.PMREMGenerator(renderer);
+            pmremGenerator.compileEquirectangularShader();
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.addEventListener('change', render);
+            controls.minDistance = 2;
+            controls.maxDistance = 10;
+            controls.target.set(0, 0, -0.2);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            document.body.appendChild(VRButton.createButton(renderer));
+
+            const options = {
+                requiredFeatures: ['hit-test'],
+                optionalFeatures: ['dom-overlay']
+            };
+
+            renderer.xr.getDevice().requestSession(options).then(onSessionStarted);
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function onSessionStarted(session) {
+            renderer.xr.setSession(session);
+
+            session.addEventListener('end', () => {
+                hitTestSourceRequested = false;
+                hitTestSource = null;
+            });
+
+            session.requestReferenceSpace('unbounded').then((refSpace) => {
+                referenceSpace = refSpace;
+                session.requestHitTestSource({ space: refSpace }).then(source => {
+                    hitTestSource = source;
+                    hitTestSourceRequested = true;
+                });
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            render();
+        }
+
+        function render() {
+            renderer.render(scene, camera);
+        }
+
+        function animate() {
+            renderer.setAnimationLoop(function () {
+                if (hitTestSourceRequested) {
+                    if (renderer.xr.getSession()) {
+                        renderer.xr.getSession().requestHitTestResults(hitTestSource).then(results => {
+                            if (results.length) {
+                                const hit = results[0];
+                                reticle.visible = true;
+                                reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
+                            }
+                        });
+                    }
+                }
+                render();
+            });
+        }
+    </script>
 </body>
 </html>
+
 
 
