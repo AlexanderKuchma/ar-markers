@@ -11,32 +11,31 @@
 </head>
 <body style='margin : 0px; overflow: hidden;'>
     <a-scene embedded arjs='sourceType: webcam;'>
-        <!-- обрабатываем маркер с вашим собственным паттерном -->
-        <a-marker type='pattern' patternUrl='path/to/pattern-marker.patt'>
-            <!-- Загрузка и использование GLB модели -->
-            <a-assets>
-                <a-asset-item id="scaniverse-model" src="https://YOUR_USERNAME.github.io/ar-markers/models/Scaniverse_2024-07-15_170330.glb"></a-asset-item>
-            </a-assets>
+        <!-- Загрузка ассетов -->
+        <a-assets>
+            <a-asset-item id="scaniverse-model" src="https://alexanderkuchma.github.io/ar-markers/models/Scaniverse_2024-07-15_170330.glb"></a-asset-item>
+        </a-assets>
+
+        <!-- Обрабатываем маркер с вашим собственным паттерном -->
+        <a-marker type='pattern' patternUrl='https://alexanderkuchma.github.io/ar-markers/path/to/pattern-marker.patt'>
+            <!-- Использование GLB модели -->
             <a-entity gltf-model="#scaniverse-model" scale="0.5 0.5 0.5"></a-entity>
         </a-marker>
 
-        <!-- обрабатываем маркер с предустановкой hiro -->
+        <!-- Обрабатываем маркер с предустановкой hiro -->
         <a-marker preset='hiro'>
-            <!-- Загрузка и использование GLB модели -->
-            <a-assets>
-                <a-asset-item id="another-model" src="https://AlexanderKuchma.github.io/ar-markers/models/Scaniverse_2024-07-15_170330.glb"></a-asset-item>
-            </a-assets>
-            <a-entity gltf-model="#another-model" scale="0.5 0.5 0.5"></a-entity>
+            <a-entity gltf-model="#scaniverse-model" scale="0.5 0.5 0.5"></a-entity>
         </a-marker>
 
-        <!-- обрабатываем маркер штрих-кода -->
+        <!-- Обрабатываем маркер штрих-кода -->
         <a-marker type='barcode' value='5'>
             <a-box position='0 0.5 0' material='color: blue;'></a-box>
         </a-marker>
 
-        <!-- добавляем простую камеру -->
+        <!-- Добавляем простую камеру -->
         <a-entity camera></a-entity>
     </a-scene>
 </body>
 </html>
+
 
