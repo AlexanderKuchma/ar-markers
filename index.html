@@ -17,7 +17,7 @@
         // Function to set the model URL based on query parameter
         function setModelUrl() {
             const modelName = getQueryParam('model') || 'Scaniverse_2024-07-15_170330.glb'; // Default model if no parameter
-            const modelUrl = `https://raw.githubusercontent.com/yourusername/yourrepo/main/models/${modelName}`;
+            const modelUrl = `https://raw.githubusercontent.com/AlexanderKuchma/ar-markers/main/models/${modelName}`;
             document.getElementById('model').setAttribute('gltf-model', `url(${modelUrl})`);
         }
 
