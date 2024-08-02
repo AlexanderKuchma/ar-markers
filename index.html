@@ -2,164 +2,35 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Three.js AR Demo</title>
-    <link rel="stylesheet" href="css/main.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Model Viewer</title>
+    <link rel="stylesheet" href="main.css">
+    <style>
+        body { margin: 0; overflow: hidden; }
+        a-scene { position: absolute; width: 100%; height: 100%; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@1.2.0/dist/aframe-master.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.3.2/aframe/build/aframe-ar.js"></script>
 </head>
 <body>
-    <div id="container"></div>
-    <div id="mySidenav" class="sidenav">
-        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
-        <a class="ar-object" id="Scaniverse_2024-07-15_170330" href="#">Load Model</a>
-    </div>
-    <span style="font-size:30px;cursor:pointer;position: absolute;" onclick="openNav()">&#9776; open</span>
-    <button type="button" id="place-button">PLACE</button>
+    <a-scene embedded arjs>
+        <a-marker preset="hiro">
+            <a-entity id="model" rotation="0 180 0" scale="0.5 0.5 0.5"></a-entity>
+        </a-marker>
+        <a-entity camera></a-entity>
+    </a-scene>
 
-    <script type="module">
-        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
-    import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/webxr/ARButton.js';
-    import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/webxr/VRButton.js';
-    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/controls/OrbitControls.js';
-    import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/loaders/GLTFLoader.js';
-    import { RGBELoader } from 'https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/loaders/RGBELoader.js';
-
-        let container, camera, scene, renderer;
-        let controller, reticle, pmremGenerator, currentObject, controls;
-        let hitTestSource = null;
-        let hitTestSourceRequested = false;
-
-        init();
-        animate();
-
-        document.querySelector(".ar-object").addEventListener("click", function () {
-            if (currentObject != null) {
-                scene.remove(currentObject);
-            }
-            loadModel(this.id);
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const modelEntity = document.getElementById('model');
+            const loader = new THREE.GLTFLoader();
+            loader.load('./models/Scaniverse_2024-07-15_170330.glb', (gltf) => {
+                modelEntity.object3D.add(gltf.scene);
+            }, undefined, (error) => {
+                console.error('An error occurred while loading the model:', error);
+            });
         });
-
-        document.getElementById("place-button").addEventListener("click", arPlace);
-
-        function arPlace() {
-            if (reticle.visible) {
-                currentObject.position.setFromMatrixPosition(reticle.matrix);
-                currentObject.visible = true;
-            }
-        }
-
-        function loadModel(model) {
-            new RGBELoader()
-                .setDataType(THREE.UnsignedByteType)
-                .setPath('textures/')
-                .load('photo_studio_01_1k.hdr', function (texture) {
-                    const envmap = pmremGenerator.fromEquirectangular(texture).texture;
-                    scene.environment = envmap;
-                    texture.dispose();
-                    pmremGenerator.dispose();
-
-                    const loader = new GLTFLoader().setPath('models/');
-                    loader.load(model + ".glb", function (glb) {
-                        currentObject = glb.scene;
-                        scene.add(currentObject);
-                        arPlace();
-
-                        const box = new THREE.Box3();
-                        box.setFromObject(currentObject);
-                        box.center(controls.target);
-
-                        controls.update();
-                    });
-                });
-        }
-
-        function init() {
-            container = document.createElement('div');
-            document.getElementById("container").appendChild(container);
-
-            scene = new THREE.Scene();
-
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.001, 200);
-
-            const directionalLight = new THREE.DirectionalLight(0xdddddd, 1);
-            directionalLight.position.set(0, 0, 1).normalize();
-            scene.add(directionalLight);
-
-            const ambientLight = new THREE.AmbientLight(0x222222);
-            scene.add(ambientLight);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            container.appendChild(renderer.domElement);
-
-            pmremGenerator = new THREE.PMREMGenerator(renderer);
-            pmremGenerator.compileEquirectangularShader();
-
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.addEventListener('change', render);
-            controls.minDistance = 2;
-            controls.maxDistance = 10;
-            controls.target.set(0, 0, -0.2);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-
-            document.body.appendChild(VRButton.createButton(renderer));
-
-            const options = {
-                requiredFeatures: ['hit-test'],
-                optionalFeatures: ['dom-overlay']
-            };
-
-            renderer.xr.getDevice().requestSession(options).then(onSessionStarted);
-
-            window.addEventListener('resize', onWindowResize);
-        }
-
-        function onSessionStarted(session) {
-            renderer.xr.setSession(session);
-
-            session.addEventListener('end', () => {
-                hitTestSourceRequested = false;
-                hitTestSource = null;
-            });
-
-            session.requestReferenceSpace('unbounded').then((refSpace) => {
-                referenceSpace = refSpace;
-                session.requestHitTestSource({ space: refSpace }).then(source => {
-                    hitTestSource = source;
-                    hitTestSourceRequested = true;
-                });
-            });
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            render();
-        }
-
-        function render() {
-            renderer.render(scene, camera);
-        }
-
-        function animate() {
-            renderer.setAnimationLoop(function () {
-                if (hitTestSourceRequested) {
-                    if (renderer.xr.getSession()) {
-                        renderer.xr.getSession().requestHitTestResults(hitTestSource).then(results => {
-                            if (results.length) {
-                                const hit = results[0];
-                                reticle.visible = true;
-                                reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
-                            }
-                        });
-                    }
-                }
-                render();
-            });
-        }
     </script>
 </body>
 </html>
